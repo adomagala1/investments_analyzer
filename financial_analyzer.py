@@ -2,57 +2,69 @@
 import re
 import os
 import json
-import time
-import wget
+import requests  # Używamy requests zamiast wget
+from concurrent.futures import ThreadPoolExecutor, as_completed # Klucz do równoległości
 import config
 
 # Lista pól z danymi finansowymi do wyciągnięcia
-# Na podstawie prośby użytkownika i analizy kodu źródłowego biznesradar.pl
 FINANCIAL_FIELDS = [
-    "IncomeRevenues",           # Przychody netto ze sprzedaży
-    "IncomeGrossProfit",        # Zysk (strata) brutto ze sprzedaży
-    "IncomeEBIT",               # Zysk (strata) na działalności operacyjnej (EBIT)
-    "IncomeBeforeTaxProfit",    # Zysk (strata) brutto
-    "IncomeNetProfit",          # Zysk (strata) netto
+    "IncomeRevenues",
+    "IncomeGrossProfit",
+    "IncomeEBIT",
+    "IncomeBeforeTaxProfit",
+    "IncomeNetProfit",
 ]
+
+# Ustawiamy nagłówek User-Agent, aby udawać przeglądarkę. Zmniejsza to ryzyko blokady.
+HTTP_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
+# Liczba jednoczesnych pobrań. Można dostosować w zależności od łącza internetowego.
+MAX_WORKERS = 10
 
 
 def extract_financial_data_from_html(html_content):
-    """
-    Wyciąga dane finansowe dla określonych pól z treści HTML.
-    Używa wyrażeń regularnych zgodnie z wymaganiami.
-    """
+    """Wyciąga dane finansowe dla określonych pól z treści HTML."""
     report_data = {}
     for field in FINANCIAL_FIELDS:
-        # Wzorzec regex do znalezienia całego wiersza tabeli dla danego pola 'data-field'
         row_pattern = rf'<tr[^>]*data-field="{field}"[^>]*>(.*?)</tr>'
         row_match = re.search(row_pattern, html_content, re.DOTALL)
-
         if row_match:
             row_html = row_match.group(1)
-            # Wzorzec regex do znalezienia pierwszej komórki z danymi liczbowymi
-            # Komórki te mają klasę 'text-right'
             cell_pattern = r'<td class="text-right"[^>]*>([^<]+)</td>'
             cell_match = re.search(cell_pattern, row_html)
-
             if cell_match:
-                # Czyszczenie wyodrębnionej wartości
-                value = cell_match.group(1).strip()
-                # Usunięcie spacji używanych jako separatory tysięcy
-                value = value.replace(" ", "")
+                value = cell_match.group(1).strip().replace(" ", "")
                 report_data[field] = value
             else:
                 report_data[field] = "N/A"
         else:
             report_data[field] = "N/A"
-
     return report_data
 
+def fetch_financials_for_ticker(ticker: str):
+    """
+    Pobiera i przetwarza dane finansowe dla JEDNEJ spółki.
+    Ta funkcja będzie wykonywana w osobnym wątku.
+    """
+    url = f"https://www.biznesradar.pl/raporty-finansowe-rachunek-zyskow-i-strat/{ticker}"
+    try:
+        # Używamy requests.get() - dane są pobierane do pamięci, bez zapisu na dysk
+        response = requests.get(url, headers=HTTP_HEADERS, timeout=10)
+        # Sprawdzamy, czy zapytanie się powiodło (kod 200)
+        response.raise_for_status()
+
+        financial_data = extract_financial_data_from_html(response.text)
+        print(f"Pobrano dane dla: {ticker}")
+        return ticker, financial_data
+    except requests.exceptions.RequestException as e:
+        print(f"Błąd podczas pobierania danych dla {ticker}: {e}")
+        return ticker, {"error": "data not found or connection error"}
 
 def enrich_with_financials(date_str: str):
     """
-    Wczytuje plik JSON z danymi dziennymi, iteruje po tickerach,
-    pobiera raporty finansowe i zapisuje wzbogacone dane z powrotem do tego samego pliku.
+    Wzbogaca plik JSON o dane finansowe, pobierając je równolegle dla wszystkich spółek.
     """
     json_filename = f"{date_str}.json"
     full_path = os.path.join(config.data_path, json_filename)
@@ -68,43 +80,26 @@ def enrich_with_financials(date_str: str):
         print(f"Błąd podczas odczytu {full_path}: {e}")
         return
 
-    print(f"\nWzbogacanie danych dla {date_str} o raporty finansowe...")
+    tickers = list(daily_data.keys())
+    print(f"\nRozpoczynanie równoległego pobierania danych finansowych dla {len(tickers)} spółek...")
 
-    temp_html_file = "temp_financial_report.html"
+    # Używamy ThreadPoolExecutor do zarządzania pulą wątków
+    # To jest serce optymalizacji!
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        # Tworzymy listę "zadań" do wykonania - jedno zadanie na każdy ticker
+        future_to_ticker = {executor.submit(fetch_financials_for_ticker, ticker): ticker for ticker in tickers}
 
-    for ticker in daily_data.keys():
-        print(f"Pobieranie danych finansowych dla {ticker}...")
-
-        # Uwaga: Ten format URL może nie działać dla niektórych tickerów (np. 'PEP' vs 'POLENERGIA').
-        # Bardziej niezawodne rozwiązanie wymagałoby dodatkowego wyszukiwania,
-        # ale na razie używamy bezpośrednio tickera.
-        url = f"https://www.biznesradar.pl/raporty-finansowe-rachunek-zyskow-i-strat/{ticker}"
-
-        try:
-            if os.path.exists(temp_html_file):
-                os.remove(temp_html_file)
-
-            # Pobieranie strony w trybie cichym, aby nie zaśmiecać konsoli
-            wget.download(url, out=temp_html_file, bar=None)
-
-            with open(temp_html_file, 'r', encoding='utf-8') as f:
-                html_content = f.read()
-
-            financial_data = extract_financial_data_from_html(html_content)
-            daily_data[ticker]["financial_report"] = financial_data
-            print(f"Pomyślnie dodano dane finansowe dla {ticker}.")
-
-        except Exception as e:
-            # Wyłapuje błędy HTTP z wget i inne problemy
-            print(f"Nie można pobrać lub przetworzyć danych finansowych dla {ticker}. Błąd: {e}")
-            daily_data[ticker]["financial_report"] = {"error": "data not found"}
-
-        finally:
-            if os.path.exists(temp_html_file):
-                os.remove(temp_html_file)
-
-        # Czekamy sekundę między zapytaniami, aby nie obciążać serwera
-        time.sleep(1)
+        # Zbieramy wyniki, gdy tylko się pojawią
+        for future in as_completed(future_to_ticker):
+            try:
+                ticker, financial_data = future.result()
+                if ticker in daily_data:
+                    daily_data[ticker]["financial_report"] = financial_data
+            except Exception as e:
+                ticker_name = future_to_ticker[future]
+                print(f"Wystąpił wyjątek podczas przetwarzania {ticker_name}: {e}")
+                if ticker_name in daily_data:
+                    daily_data[ticker_name]["financial_report"] = {"error": "processing failed"}
 
     # Zapisz zaktualizowane dane z powrotem do pliku JSON
     try:
