@@ -2,6 +2,7 @@
 import os
 
 data_path = "./data"
+shits_path = "./shits"
 
 
 def create_paths():

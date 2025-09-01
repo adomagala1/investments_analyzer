@@ -1,7 +1,6 @@
 # main.py
 import scraper
 import data_packager as analysis
-import financial_analyzer
 
 
 def main(day=None, month=None, year=None):
@@ -9,8 +8,6 @@ def main(day=None, month=None, year=None):
     if not date_str:
         return
     analysis.anal_json(date_str)
-
-    financial_analyzer.enrich_with_financials(date_str)
 
     scraper.remove()
 

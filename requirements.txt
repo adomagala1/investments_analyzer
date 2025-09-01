@@ -1,0 +1,5 @@
+lmxl
+bs4
+requests
+wget
+dotenv

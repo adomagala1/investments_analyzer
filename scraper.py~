@@ -1,9 +1,11 @@
 # scraper.py
+
 import os
 import datetime
 import wget
 from dotenv import load_dotenv
 
+from config import shits_path
 load_dotenv()
 
 
@@ -30,12 +32,12 @@ def download(day=None, month=None, year=None):
     URL = os.getenv("URL")
     URL3 = os.getenv("URL3")
     filename = os.getenv("FILENAME")
-
+    filepath = os.path.join(shits_path, filename)
     date_str = f"{day}-{month}-{year}"
     full_url = URL + date_str + URL3
 
     try:
-        wget.download(full_url, filename)
+        wget.download(full_url, filepath)
         print(f"\nDownload successfully completed for date: {date_str}, {full_url}")
         return date_str
     except Exception as e:
