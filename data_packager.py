@@ -1,0 +1,48 @@
+#data_packager.py
+import re
+import os
+import json
+import config
+
+
+def extract_rows_from_html(html):
+    row_pattern = r"<tr[^>]*>(.*?)</tr>"
+    rows = re.findall(row_pattern, html, re.DOTALL)
+
+    data = {}
+    cell_pattern = r'<td[^>]*>(?:<span[^>]*></span>)?([^<]+)</td>'
+
+    for row in rows:
+        cells = re.findall(cell_pattern, row, re.DOTALL)
+        cells = [c.replace("\xa0", " ").replace("&nbsp;", " ").strip() for c in cells]
+        if len(cells) == 8:
+            ticker = cells[0]
+            data[ticker] = {
+                "currency": cells[1],
+                "open": cells[2],
+                "high": cells[3],
+                "low": cells[4],
+                "close": cells[5],
+                "change_percent": cells[6],
+                "volume": cells[7]
+            }
+    return data
+
+
+def anal_json(date_str: str):
+    try:
+        with open(os.getenv("FILENAME"), encoding="utf-8") as f:
+            tmp = f.read()
+
+        values = extract_rows_from_html(tmp)
+
+        out_name = f"{date_str}.json"
+        out_path = config.data_path
+        full_path = os.path.join(out_path, out_name)
+        with open(full_path, "w", encoding="utf-8") as file:
+            json.dump(values, file, ensure_ascii=False, indent=4)
+
+        print(f"Dane zapisane do {out_name}")
+
+    except OSError as e:
+        print("Error: ", e)
