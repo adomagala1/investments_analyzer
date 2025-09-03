@@ -13,7 +13,7 @@ def main(day=None, month=None, year=None):
 
 
 if __name__ == "__main__":
-    for day in range(1, 5):
+    # for day in range(1, 5):
         # Aby przetestować, użyj dat z przeszłości, np. month=8, year=2023
-        main(day=day, month=8, year=2025)
-    # main()
+        # main(day=day, month=8, year=2025)
+    main()
