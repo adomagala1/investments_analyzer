@@ -30,7 +30,6 @@ def extract_rows_from_html(html):
     return data
 
 
-
 def process_and_store_data(date_str: str):
     """Główna funkcja, która parsuje HTML i zapisuje dane do JSON i BAZY DANYCH."""
     try:

@@ -10,7 +10,7 @@ def main(day=None, month=None, year=None):
         today = datetime.date.today()
         day, month, year = today.day, today.month, today.year
 
-    date_str = f"{day}-{month}-{year}"
+    date_str = scraper.download(day, month, year)
     html_downloaded = scraper.download(day, month, year)
     if not html_downloaded:
         print(f"{date_str} not downloaded")

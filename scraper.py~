@@ -22,12 +22,14 @@ def download(day=None, month=None, year=None):
         print("Invalid date")
         return None
 
-    if date_obj.weekday() >= 5:
+    if date_obj.weekday() >= 5:  # weekend
         print(f"Date: {date_obj} is a weekend")
         return None
 
-    date_str_for_db = date_obj.strftime('%d-%m-%Y')
-    date_str_for_url = f"{day}-{month}-{year}"
+    # --- KLUCZOWA ZMIANA TUTAJ ---
+    # Używamy strftime do formatowania daty, żeby zawsze mieć wiodące zera
+    date_str_for_db = date_obj.strftime('%d-%m-%Y')  # Format DD-MM-YYYY np. 03-09-2025
+    date_str_for_url = f"{day}-{month}-{year}"  # Strona GPW akceptuje format bez zer
 
     URL = os.getenv("URL")
     URL3 = os.getenv("URL3")
@@ -36,15 +38,17 @@ def download(day=None, month=None, year=None):
     full_url = URL + date_str_for_url + URL3
 
     try:
+        # Usuń stary plik jeśli istnieje, żeby uniknąć problemów
         if os.path.exists(filename):
             os.remove(filename)
 
         wget.download(full_url, filename)
         print(f"\nDownload successfully completed for date: {date_str_for_db}")
+        # Zwracamy datę w poprawnym formacie DD-MM-YYYY
         return date_str_for_db
     except Exception as e:
         print("Error: ", e)
-        return None
+        return None  
 
 
 def remove():

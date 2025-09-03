@@ -80,10 +80,10 @@ def insert_daily_data(date_str: str, data: dict):
                 values.get('change_percent'),
                 volume
             ))
-            inserted_count += cursor.rowcount  # Zlicza tylko faktycznie wstawione wiersze
+            inserted_count += cursor.rowcount
         except (ValueError, sqlite3.IntegrityError) as e:
             print(f"Błąd przy wstawianiu danych dla {ticker} w dniu {date_str}: {e}")
-            continue  # Przejdź do następnego rekordu
+            continue
 
     conn.commit()
     conn.close()
