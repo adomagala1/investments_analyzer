@@ -6,7 +6,7 @@ import database
 
 st.set_page_config(layout="wide")
 
-st.title("🗂️ Analizator Rynku GPW - Kokpit")
+st.title("Analizator Rynku GPW")
 
 
 @st.cache_data(ttl=600)  # Cache'uje dane na 10 minut
@@ -14,6 +14,8 @@ def load_data_from_db():
     """Ładuje wszystkie dane z bazy do DataFrame'a z Pandas."""
     conn = database.get_db_connection()
     # 'YYYY-MM-DD' format jest lepszy do sortowania
+
+    # tu sobie iso zapisujemy
     query = "SELECT *, substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) as iso_date FROM daily_quotes"
     df = pd.read_sql_query(query, conn)
     conn.close()
