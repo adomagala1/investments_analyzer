@@ -17,7 +17,7 @@ def load_data_from_db():
     query = "SELECT *, substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) as iso_date FROM daily_quotes"
     df = pd.read_sql_query(query, conn)
     conn.close()
-    df['iso_date'] = pd.to_datetime(df['iso_date'], errors='coerce')
+    df['iso_date'] = pd.to_datetime(df['iso_date'], format='%Y-%m-%d', errors='coerce')
     df = df.sort_values('iso_date')
     return df
 

@@ -24,7 +24,7 @@ if __name__ == "__main__":
     database.init_db()
     print("Rozpoczynam pobieranie danych historycznych...")
 
-    for i in range(10):
+    for i in range(60):
         date_to_fetch = datetime.date.today() - datetime.timedelta(days=i)
         main(day=date_to_fetch.day, month=date_to_fetch.month, year=date_to_fetch.year)
 
