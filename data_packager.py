@@ -3,6 +3,7 @@ import re
 import os
 import json
 import config
+import database
 
 
 def extract_rows_from_html(html):
@@ -29,20 +30,28 @@ def extract_rows_from_html(html):
     return data
 
 
-def anal_json(date_str: str):
-    try:
-        with open(os.getenv("FILENAME"), encoding="utf-8") as f:
-            tmp = f.read()
 
-        values = extract_rows_from_html(tmp)
+def process_and_store_data(date_str: str):
+    """Główna funkcja, która parsuje HTML i zapisuje dane do JSON i BAZY DANYCH."""
+    try:
+        filename = os.getenv("FILENAME")
+        with open(filename, encoding="utf-8") as f:
+            html_content = f.read()
+
+        daily_data = extract_rows_from_html(html_content)
+        if not daily_data:
+            print("Nie udało się wyodrębnić danych z pliku HTML.")
+            return
 
         out_name = f"{date_str}.json"
-        out_path = config.data_path
-        full_path = os.path.join(out_path, out_name)
+        full_path = os.path.join(config.data_path, out_name)
         with open(full_path, "w", encoding="utf-8") as file:
-            json.dump(values, file, ensure_ascii=False, indent=4)
+            json.dump(daily_data, file, ensure_ascii=False, indent=4)
+        print(f"Dane zarchiwizowane w {out_name}")
 
-        print(f"Dane zapisane do {out_name}")
+        database.insert_daily_data(date_str, daily_data)
 
     except OSError as e:
-        print("Error: ", e)
+        print(f"Błąd pliku: {e}")
+    except Exception as e:
+        print(f"Wystąpił nieoczekiwany błąd: {e}")

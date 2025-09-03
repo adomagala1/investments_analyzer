@@ -1,5 +1,7 @@
-lmxl
 bs4
 requests
 wget
 dotenv
+pandas
+streamlit
+plotly

@@ -1,0 +1,90 @@
+# database.py
+import sqlite3
+import os
+import config
+
+DB_NAME = "gpw_data.db"
+DB_PATH = os.path.join(config.data_path, DB_NAME)
+
+
+def get_db_connection():
+    """Nawiązuje połączenie z bazą danych."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    """Tworzy tabelę w bazie danych, jeśli jeszcze nie istnieje."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Tabela do przechowywania dziennych notowań
+    # Dodajemy UNIQUE constraint, żeby nie dublować danych dla tej samej spółki tego samego dnia
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS daily_quotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        ticker TEXT NOT NULL,
+        currency TEXT,
+        open REAL,
+        high REAL,
+        low REAL,
+        close REAL,
+        change_percent TEXT,
+        volume INTEGER,
+        UNIQUE(date, ticker)
+    )
+    ''')
+
+    print(f"Baza danych '{DB_NAME}' zainicjalizowana.")
+    conn.commit()
+    conn.close()
+
+
+def insert_daily_data(date_str: str, data: dict):
+    """Wstawia dane dzienne do bazy danych."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    inserted_count = 0
+    for ticker, values in data.items():
+        try:
+            # Czyszczenie i konwersja danych przed wstawieniem
+            volume_str = values.get('volume', '0').replace(' ', '')
+            volume = int(volume_str) if volume_str.isdigit() else 0
+
+            # POPRAWKA: wycinamy spacje z cen przed konwersją na float
+            open_price_str = values.get('open', '0.0').replace(',', '.').replace(' ', '')
+            high_price_str = values.get('high', '0.0').replace(',', '.').replace(' ', '')
+            low_price_str = values.get('low', '0.0').replace(',', '.').replace(' ', '')
+            close_price_str = values.get('close', '0.0').replace(',', '.').replace(' ', '')
+
+            open_price = float(open_price_str)
+            high_price = float(high_price_str)
+            low_price = float(low_price_str)
+            close_price = float(close_price_str)
+
+            cursor.execute('''
+            INSERT INTO daily_quotes (date, ticker, currency, open, high, low, close, change_percent, volume)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(date, ticker) DO NOTHING
+            ''', (
+                date_str,
+                ticker,
+                values.get('currency'),
+                open_price,
+                high_price,
+                low_price,
+                close_price,
+                values.get('change_percent'),
+                volume
+            ))
+            inserted_count += cursor.rowcount  # Zlicza tylko faktycznie wstawione wiersze
+        except (ValueError, sqlite3.IntegrityError) as e:
+            print(f"Błąd przy wstawianiu danych dla {ticker} w dniu {date_str}: {e}")
+            continue  # Przejdź do następnego rekordu
+
+    conn.commit()
+    conn.close()
+    print(f"Wstawiono {inserted_count} nowych rekordów do bazy danych dla daty {date_str}.")
