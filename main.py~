@@ -5,9 +5,8 @@ import datetime
 
 from dotenv import load_dotenv
 
+import utils
 from utils import delete_data_files
-from scraper_reports import scrape_company
-
 import scraper
 import data_packager
 import database
@@ -46,9 +45,9 @@ if __name__ == "__main__":
         else:
             logging.info(f"Date: {date_to_fetch} is a weekend")
 
-    logging.info("Pobieranie danych cenowych itp zakonczono.")
+    logging.info("Pobieranie danych zakonczono.")
 
     # usuwamie plikow tmp
     logging.info("Rozpoczynam usuwanie danych tmp...")
-    delete_data_files()
+    utils.delete_data_files()
     logging.info("Usuwanie danych tmp zakonczono.")

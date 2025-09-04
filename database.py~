@@ -43,7 +43,7 @@ def init_db():
             company_name TEXT,
             sector TEXT
         )
-        ''')
+        '''
 
     print(f"Baza danych '{DB_NAME}' zainicjalizowana.")
     conn.commit()
