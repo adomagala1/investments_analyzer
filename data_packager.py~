@@ -7,14 +7,16 @@ import database
 from bs4 import BeautifulSoup
 
 def extract_rows_from_html(html):
-    soup = BeautifulSoup(html, "html.parser")
-    data = {}
+    row_pattern = r"<tr[^>]*>(.*?)</tr>"
+    rows = re.findall(row_pattern, html, re.DOTALL)
 
-    # Znajdź wszystkie wiersze tabeli
-    rows = soup.find_all("tr")
+    data = {}
+    cell_pattern = r'<td[^>]*>(?:<span[^>]*></span>)?([^<]+)</td>'
+
     for row in rows:
-        cells = [c.get_text(strip=True).replace("\xa0", " ") for c in row.find_all("td")]
-        if len(cells) == 8:  # dalej zakładamy 8 kolumn
+        cells = re.findall(cell_pattern, row, re.DOTALL)
+        cells = [c.replace("\xa0", " ").replace("&nbsp;", " ").strip() for c in cells]
+        if len(cells) == 8:
             ticker = cells[0]
             data[ticker] = {
                 "currency": cells[1],

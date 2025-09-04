@@ -1,6 +1,8 @@
 # scraper.py
 import os
 import datetime
+import time
+
 import wget
 from dotenv import load_dotenv
 
@@ -37,7 +39,7 @@ def download(day=None, month=None, year=None):
 
     try:
         if os.path.exists(filename):
-            os.remove(filename)
+            safe_remove(filename)
 
         wget.download(full_url, filename)
         print(f"\nDownload successfully completed for date: {date_str_for_db}")
@@ -47,10 +49,13 @@ def download(day=None, month=None, year=None):
         return None
 
 
-def remove():
-    filename = os.getenv("FILENAME")
-    try:
-        os.remove(filename)
-        print(f"File {filename} has been deleted")
-    except OSError as e:
-        print("Error: ", e)
+def safe_remove(filename, retries=5, delay=1):
+    for i in range(retries):
+        try:
+            if os.path.exists(filename):
+                os.remove(filename)
+            return True
+        except PermissionError:
+            print(f"Plik {filename} jest używany, próba {i+1}/{retries}...")
+            time.sleep(delay)
+    return False
