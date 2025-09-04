@@ -1,0 +1,85 @@
+# scraper_reports.py
+import os
+import json
+import requests
+import logging
+from bs4 import BeautifulSoup
+import config
+import database
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+def fetch_html(url: str) -> str:
+    """Pobiera stronę HTML z podanego URL."""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        logging.info(f"Pobrano stronę: {url}")
+        return response.text
+    except Exception as e:
+        logging.error(f"Błąd przy pobieraniu strony: {e}")
+        return ""
+
+
+def parse_table(html: str) -> dict:
+    """Parsuje tabelę spółek z HTML i zwraca dane w formacie dict."""
+    soup = BeautifulSoup(html, "html.parser")
+    rows = soup.find_all("tr")
+    data = {}
+
+    for row in rows:
+        cols = [c.get_text(strip=True) for c in row.find_all("td")]
+        if len(cols) == 8:
+            ticker = cols[0]
+            try:
+                data[ticker] = {
+                    "currency": cols[1],
+                    "open": float(cols[2].replace(",", ".")),
+                    "high": float(cols[3].replace(",", ".")),
+                    "low": float(cols[4].replace(",", ".")),
+                    "close": float(cols[5].replace(",", ".")),
+                    "change_percent": cols[6],
+                    "volume": cols[7]
+                }
+            except ValueError:
+                logging.warning(f"Pominięto wiersz z błędnymi danymi: {cols}")
+    return data
+
+
+def save_data(date_str: str, data: dict):
+    """Zapisuje dane do pliku JSON i do bazy."""
+    os.makedirs(config.data_path, exist_ok=True)
+    filename = os.path.join(config.data_path, f"{date_str}.json")
+
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    logging.info(f"Zapisano dane do {filename}")
+
+    database.insert_daily_data(date_str, data)
+    logging.info("Dane zapisane do bazy danych.")
+
+
+def scraper_reports(url: str, date_str: str):
+    """Główna funkcja scrappera."""
+    html = fetch_html(url)
+    if not html:
+        logging.error("Brak HTML do przetworzenia.")
+        return
+
+    data = parse_table(html)
+    if not data:
+        logging.error("Brak danych po parsowaniu.")
+        return
+
+    save_data(date_str, data)
+    logging.info("Scraper zakończył działanie pomyślnie.")
+
+
+if __name__ == "__main__":
+    # PRZYKŁAD: uruchomienie scrappera ręcznie
+    TEST_URL = "https://www.biznesradar.pl/gielda/akcje"
+    scraper_reports(TEST_URL, "2025-09-04")
