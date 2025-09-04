@@ -2,6 +2,9 @@ import logging
 import os
 import sqlite3
 
+raporty_db = "raporty_finansowe.db"
+
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -15,12 +18,7 @@ def delete_data_files():
     logging.info(f"Usunieto plikow {len(files_deleted)} i takie np: {files_deleted}")
 
 
-
-raporty_db = "raporty_finansowe.db"
-
-
 def get_raport_db_connection():
     conn = sqlite3.connect(raporty_db)
     conn.row_factory = sqlite3.Row
     return conn
-

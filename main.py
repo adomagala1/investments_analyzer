@@ -2,13 +2,11 @@
 import logging
 import os
 import datetime
-
+import price_scraper
+import reports_scraper
 from dotenv import load_dotenv
-
 from utils import delete_data_files
-from scraper_reports import scrape_company
 
-import scraper
 import data_packager
 import database
 
@@ -25,18 +23,18 @@ def main(day=None, month=None, year=None):
         today = datetime.date.today()
         day, month, year = today.day, today.month, today.year
 
-    date_str = scraper.download(day, month, year)
-    html_downloaded = scraper.download(day, month, year)
+    date_str = price_scraper.download(day, month, year)
+    html_downloaded = price_scraper.download(day, month, year)
     if not html_downloaded:
         logging.warning("Nie pobralo sie")
         return
 
     data_packager.process_and_store_data(date_str)
-    scraper.safe_remove(os.getenv("FILENAME"))
+    price_scraper.safe_remove(os.getenv("FILENAME"))
 
 
 if __name__ == "__main__":
-    database.init_db()
+    database.init_price_db()
     logging.info("Rozpoczynam pobieranie danych...")
 
     for i in range(60):
@@ -52,3 +50,9 @@ if __name__ == "__main__":
     logging.info("Rozpoczynam usuwanie danych tmp...")
     delete_data_files()
     logging.info("Usuwanie danych tmp zakonczono.")
+
+    database.init_reports_db()
+
+    logging.info("Rozpoczynam scrapowanie raportów...")
+    reports_scraper.scrape_all_companies()
+    logging.info("Scrapowanie raportów zakonczono.")

@@ -1,9 +1,10 @@
-# scraper_reports.py
+# reports_scraper.py
 import requests
 import sqlite3
 import logging
 from bs4 import BeautifulSoup
-from database import save_to_raporty_db, init_raporty_db, get_all_tickers
+from database import save_to_raporty_db, init_reports_db, get_all_tickers
+
 
 def fetch_html(url: str) -> str:
     """Pobiera HTML z podanego URL."""
@@ -52,8 +53,18 @@ def scrape_company(symbol: str):
         logging.warning(f"Brak danych dla spółki {symbol}")
 
 
+def scrape_all_companies():
+    tickers = get_all_tickers()
+    logging.info(f"Scrapuje {len(tickers)} spółek...")
+    try:
+        for ticker in tickers:
+            scrape_company(ticker)
+    except Exception as e:
+        logging.error(f"Error during scraping: {e}")
+
+
 if __name__ == "__main__":
-    init_raporty_db()
+    # init_raporty_db()
     tickers = get_all_tickers()
     for ticker in tickers:
         scrape_company(ticker)

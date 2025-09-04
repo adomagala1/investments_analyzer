@@ -1,33 +1,9 @@
-# scraper_reports.py
+# reports_scraper.py
 import requests
 import sqlite3
 import logging
 from bs4 import BeautifulSoup
-
-DB_NAME = "raporty_finansowe.db"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
-
-def init_db():
-    """Inicjalizacja bazy danych."""
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS raporty (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            spolka TEXT NOT NULL,
-            pole TEXT NOT NULL,
-            wartosci TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
-    logging.info("Baza danych gotowa.")
-
+from database import save_to_raporty_db, init_reports_db, get_all_tickers
 
 def fetch_html(url: str) -> str:
     """Pobiera HTML z podanego URL."""
@@ -64,20 +40,6 @@ def parse_report(html: str) -> list:
     return records
 
 
-def save_to_db(spolka: str, records: list):
-    """Zapisuje raporty do SQLite."""
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    for record in records:
-        c.execute(
-            "INSERT INTO raporty (spolka, pole, wartosci) VALUES (?, ?, ?)",
-            (spolka, record["pole"], ", ".join(record["wartosci"]))
-        )
-    conn.commit()
-    conn.close()
-    logging.info(f"Zapisano {len(records)} rekordów dla spółki {spolka}")
-
-
 def scrape_company(symbol: str):
     """Scrapuje raport finansowy dla jednej spółki."""
     url = f"https://www.biznesradar.pl/raporty-finansowe-rachunek-zyskow-i-strat/{symbol}"
@@ -85,12 +47,13 @@ def scrape_company(symbol: str):
     html = fetch_html(url)
     records = parse_report(html)
     if records:
-        save_to_db(symbol, records)
+        save_to_raporty_db(symbol, records)
     else:
         logging.warning(f"Brak danych dla spółki {symbol}")
 
 
 if __name__ == "__main__":
-    init_db()
-    # TEST: pobranie raportu dla 06N
-    scrape_company("06N")
+    # init_raporty_db()
+    tickers = get_all_tickers()
+    for ticker in tickers:
+        scrape_company(ticker)

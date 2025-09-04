@@ -1,26 +1,43 @@
 # database.py
+import logging
 import sqlite3
 import os
 import config
 
-DB_NAME = "gpw_data.db"
-DB_PATH = os.path.join(config.data_path, DB_NAME)
+price_db = "gpw_data.db"
+reports_db = "raporty_finansowe.db"
+price_db_path = os.path.join(config.data_path, price_db)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 
-def get_db_connection():
-    """Nawiązuje połączenie z bazą danych."""
-    conn = sqlite3.connect(DB_PATH)
+def get_db_price_connection():
+    conn = sqlite3.connect(price_db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db():
-    """Tworzy tabelę w bazie danych, jeśli jeszcze nie istnieje."""
-    conn = get_db_connection()
+def get_db_reports_connection():
+    conn = sqlite3.connect(reports_db)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_price_db():
+    conn = get_db_price_connection()
     cursor = conn.cursor()
 
-    # Tabela do przechowywania dziennych notowań
-    # Dodajemy UNIQUE constraint, żeby nie dublować danych dla tej samej spółki tego samego dnia
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS tickers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticker TEXT UNIQUE NOT NULL,
+        company_name TEXT,
+        sector TEXT
+    )
+    ''')
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS daily_quotes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,33 +53,60 @@ def init_db():
         UNIQUE(date, ticker)
     )
     ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tickers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ticker TEXT UNIQUE NOT NULL,
-            company_name TEXT,
-            sector TEXT
-        )
-        ''')
-
-    print(f"Baza danych '{DB_NAME}' zainicjalizowana.")
     conn.commit()
     conn.close()
+    logging.info(f"Baza cen '{price_db}' zainicjalizowana.")
+
+
+def init_reports_db():
+    conn = get_db_reports_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS raporty (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        spolka TEXT NOT NULL,
+        pole TEXT NOT NULL,
+        wartosci TEXT NOT NULL
+    )
+    ''')
+    conn.commit()
+    conn.close()
+    logging.info(f"Baza raportów '{reports_db}' zainicjalizowana.")
+
+def get_all_tickers():
+    conn = get_db_price_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT ticker FROM tickers")
+    tickers = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return tickers
+
+
+def save_to_raporty_db(spolka: str, records: list):
+    """Zapisuje raporty do SQLite."""
+    conn = sqlite3.connect(reports_db)
+    c = conn.cursor()
+    for record in records:
+        c.execute(
+            "INSERT INTO raporty (spolka, pole, wartosci) VALUES (?, ?, ?)",
+            (spolka, record["pole"], ", ".join(record["wartosci"]))
+        )
+    conn.commit()
+    conn.close()
+    logging.info(f"Zapisano {len(records)} rekordów dla spółki {spolka}")
 
 
 def insert_daily_data(date_str: str, data: dict):
     """Wstawia dane dzienne do bazy danych."""
-    conn = get_db_connection()
+    conn = get_db_price_connection()
     cursor = conn.cursor()
 
     inserted_count = 0
     for ticker, values in data.items():
         try:
-            # Czyszczenie i konwersja danych przed wstawieniem
             volume_str = values.get('volume', '0').replace(' ', '')
             volume = int(volume_str) if volume_str.isdigit() else 0
 
-            # POPRAWKA: wycinamy spacje z cen przed konwersją na float
             open_price_str = values.get('open', '0.0').replace(',', '.').replace(' ', '')
             high_price_str = values.get('high', '0.0').replace(',', '.').replace(' ', '')
             low_price_str = values.get('low', '0.0').replace(',', '.').replace(' ', '')
@@ -95,4 +139,4 @@ def insert_daily_data(date_str: str, data: dict):
 
     conn.commit()
     conn.close()
-    print(f"Wstawiono {inserted_count} nowych rekordów do bazy danych dla daty {date_str}.")
+    print(f"Wstawiono {inserted_count} nowych rekordów do bazy danych dla daty {date_str}")

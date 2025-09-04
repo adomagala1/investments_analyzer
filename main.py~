@@ -2,12 +2,10 @@
 import logging
 import os
 import datetime
-
+import price_scraper as scraper
 from dotenv import load_dotenv
-
-import utils
 from utils import delete_data_files
-import scraper
+
 import data_packager
 import database
 
@@ -35,7 +33,7 @@ def main(day=None, month=None, year=None):
 
 
 if __name__ == "__main__":
-    database.init_db()
+    database.init_price_db()
     logging.info("Rozpoczynam pobieranie danych...")
 
     for i in range(60):
@@ -45,9 +43,15 @@ if __name__ == "__main__":
         else:
             logging.info(f"Date: {date_to_fetch} is a weekend")
 
-    logging.info("Pobieranie danych zakonczono.")
+    logging.info("Pobieranie danych cenowych itp zakonczono.")
 
     # usuwamie plikow tmp
     logging.info("Rozpoczynam usuwanie danych tmp...")
-    utils.delete_data_files()
+    delete_data_files()
     logging.info("Usuwanie danych tmp zakonczono.")
+
+    database.init_reports_db()
+
+    logging.info("Rozpoczynam scrapowanie raportów...")
+    scraper.scrape_all_companies()
+    logging.info("Scrapowanie raportów zakonczono.")
